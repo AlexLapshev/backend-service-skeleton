@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from typing import Union, Optional, Any, Dict, List
 
 from app.models import User, Transaction, TransactionType
@@ -52,6 +53,8 @@ class TransactionCrud:
             timestamp = datetime.datetime.now()
         else:
             timestamp = datetime.datetime.fromisoformat(timestamp)
+        if not uid:
+            uid = uuid.uuid4()
         transaction = await Transaction.create(
             type=transaction_type,
             amount=amount,
