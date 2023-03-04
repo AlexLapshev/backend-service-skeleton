@@ -1,13 +1,11 @@
 import uvloop
 from aiohttp import web
+from dotenv.main import load_dotenv
 
 from app.app import init_app
 
 
-def create_app() -> web.Application:
-    app = init_app()
-
-    return app
+load_dotenv()
 
 
 def main() -> None:
