@@ -47,7 +47,7 @@ async def add_transaction(request: Request) -> Response:
     amount = request_json["amount"]
     user_id = request_json["user_id"]
     transaction_type = request_json["type"]
-    async with request.app["db"].transaction():
+    async with request.app["db"].transaction() as tx:
         try:
             res, _ = await UserCrud().update_user_balance(
                 amount=amount,
@@ -58,7 +58,7 @@ async def add_transaction(request: Request) -> Response:
             return web.json_response(status=402)
 
         if res != "UPDATE 1":
-            return web.json_response(status=404)
+            await tx.raise_rollback()
 
         transaction = await TransactionCrud().create_transaction(
             amount=amount,
@@ -67,8 +67,7 @@ async def add_transaction(request: Request) -> Response:
             timestamp=request_json["timestamp"],
             uid=request_json["uid"],
         )
-
-    return web.json_response(TransactionSerializer().serialize(transaction), status=201)
+        return web.json_response(TransactionSerializer().serialize(transaction), status=201)
 
 
 async def get_transaction(request: Request) -> Response:
