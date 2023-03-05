@@ -1,6 +1,8 @@
 import datetime
 import uuid
-from typing import Union, Optional, Any, Dict, List
+from typing import Union, Optional, Any, Dict, List, Tuple
+
+from sqlalchemy import or_
 
 from app.models import User, Transaction, TransactionType
 
@@ -38,6 +40,37 @@ class UserCrud(CrudMixin):
             .where(User.id == user_id)
             .gino.status()
         )
+
+    @staticmethod
+    async def get_user_with_transaction(
+        user_id: int, timestamp: Optional[datetime.datetime] = None
+    ) -> Tuple[Optional[User], List[Transaction]]:
+        if not timestamp:
+            timestamp = datetime.datetime.now()
+        txns = await (
+            User.join(Transaction, isouter=True)
+            .select()
+            .where(User.id == user_id)
+            .where(or_(Transaction.timestamp < timestamp, Transaction.uid == None))
+        ).gino.all()
+        if not txns:
+            return None, []
+        user = User(
+            id=txns[0].id,
+            name=txns[0].name,
+            balance=txns[0].balance,
+        )
+        transactions = [
+            Transaction(
+                amount=t.amount,
+                uid=t.uid,
+                type=t.type,
+                timestamp=t.timestamp,
+                user_id=t.user_id,
+            )
+            for t in txns
+        ]
+        return user, transactions
 
 
 class TransactionCrud:

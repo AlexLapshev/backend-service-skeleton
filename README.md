@@ -2,7 +2,7 @@
 
 Create virtual environment
 
-`virtualenv venv`
+`python3.7 -m virtualenv venv`
 
 Activate it
 

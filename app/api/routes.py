@@ -18,22 +18,25 @@ async def add_user(request: Request) -> Response:
 
 async def get_user(request: Request) -> Response:
     user_id = int(request.match_info["id"])
-    date = request.query.get("date")
+    timestamp = request.query.get("date")
+    if timestamp:
+        timestamp = datetime.fromisoformat(timestamp)
+    user, user_transactions = await UserCrud().get_user_with_transaction(
+        user_id=user_id, timestamp=timestamp
+    )
+
+    if not user:
+        return web.json_response(status=404)
+
     balance = None
-    if date:
-        timestamp = datetime.fromisoformat(date)
-        user_transactions = await TransactionCrud().get_user_transactions(
-            user_id=user_id, timestamp=timestamp
+    if timestamp:
+        balance = sum(
+            [
+                t.amount if t.type == TransactionType.DEPOSIT else -abs(t.amount)
+                for t in user_transactions
+            ]
         )
-        balance = str(
-            sum(
-                [
-                    t.amount if t.type == TransactionType.DEPOSIT else -abs(t.amount)
-                    for t in user_transactions
-                ]
-            )
-        )
-    user = await UserCrud.get_user(user_id=user_id)
+        balance = "%.2f" % balance
     serialized = UserSerializer().serialize(user)
     serialized["balance"] = balance if balance is not None else serialized["balance"]
     return web.json_response(serialized, status=200)
@@ -44,25 +47,27 @@ async def add_transaction(request: Request) -> Response:
     amount = request_json["amount"]
     user_id = request_json["user_id"]
     transaction_type = request_json["type"]
-    try:
-        res, _ = await UserCrud().update_user_balance(
+    async with request.app["db"].transaction():
+        try:
+            res, _ = await UserCrud().update_user_balance(
+                amount=amount,
+                user_id=user_id,
+                transaction_type=transaction_type,
+            )
+            if res != "UPDATE 1":
+                return web.json_response(status=404)
+
+        except CheckViolationError:
+            return web.json_response(status=402)
+
+        transaction = await TransactionCrud().create_transaction(
             amount=amount,
             user_id=user_id,
             transaction_type=transaction_type,
+            timestamp=request_json["timestamp"],
+            uid=request_json["uid"],
         )
-        if res != "UPDATE 1":
-            return web.json_response(status=404)
 
-    except CheckViolationError:
-        return web.json_response(status=402)
-
-    transaction = await TransactionCrud().create_transaction(
-        amount=amount,
-        user_id=user_id,
-        transaction_type=transaction_type,
-        timestamp=request_json["timestamp"],
-        uid=request_json["uid"],
-    )
     return web.json_response(TransactionSerializer().serialize(transaction), status=201)
 
 
