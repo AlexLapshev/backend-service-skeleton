@@ -5,15 +5,16 @@ from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 from asyncpg import CheckViolationError
 
-from app.models import TransactionType
+from app.models import User
 from app.models.crud import UserCrud, TransactionCrud
+from app.models.queries import create_balance_query
 from app.models.serializers import UserSerializer, TransactionSerializer
 
 
 async def add_user(request: Request) -> Response:
     request_json = await request.json()
     user = await UserCrud().create_user(**request_json)
-    return web.json_response(UserSerializer().serialize(user), status=201)
+    return web.json_response(UserSerializer(obj=user).serialize(), status=201)
 
 
 async def get_user(request: Request) -> Response:
@@ -21,25 +22,16 @@ async def get_user(request: Request) -> Response:
     timestamp = request.query.get("date")
     if timestamp:
         timestamp = datetime.fromisoformat(timestamp)
-    user, user_transactions = await UserCrud().get_user_with_transaction(
-        user_id=user_id, timestamp=timestamp
-    )
-
-    if not user:
+    row = await request.app["db"].first(create_balance_query(user_id=user_id, timestamp=timestamp))
+    if not row:
         return web.json_response(status=404)
 
-    balance = None
-    if timestamp:
-        balance = sum(
-            [
-                t.amount if t.type == TransactionType.DEPOSIT else -abs(t.amount)
-                for t in user_transactions
-            ]
-        )
-        balance = "%.2f" % balance
-    serialized = UserSerializer().serialize(user)
-    serialized["balance"] = balance if balance is not None else serialized["balance"]
-    return web.json_response(serialized, status=200)
+    user = User(
+        id=row[0],
+        name=row[1],
+        balance=row[-1]
+    )
+    return web.json_response(UserSerializer(obj=user).serialize(), status=200)
 
 
 async def add_transaction(request: Request) -> Response:
@@ -67,7 +59,7 @@ async def add_transaction(request: Request) -> Response:
             timestamp=request_json["timestamp"],
             uid=request_json["uid"],
         )
-        return web.json_response(TransactionSerializer().serialize(transaction), status=201)
+        return web.json_response(TransactionSerializer(obj=transaction).serialize(), status=201)
 
 
 async def get_transaction(request: Request) -> Response:
@@ -77,7 +69,7 @@ async def get_transaction(request: Request) -> Response:
     )
     if not transaction:
         return web.json_response(status=404)
-    return web.json_response(TransactionSerializer().serialize(transaction), status=200)
+    return web.json_response(TransactionSerializer(obj=transaction).serialize(), status=200)
 
 
 def add_routes(app):
