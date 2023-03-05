@@ -15,10 +15,12 @@ class CrudMixin:
         return float(f"-{amount}")
 
     @staticmethod
-    def format_user(user: User) -> Dict[str, Any]:
-        user_dict = user.to_dict()
-        user_dict["balance"] = str(user_dict["balance"])
-        return user_dict
+    def get_timestamp(
+        timestamp: Optional[datetime.datetime] = None,
+    ) -> datetime.datetime:
+        if not timestamp:
+            timestamp = datetime.datetime.now()
+        return timestamp
 
 
 class UserCrud(CrudMixin):
@@ -41,12 +43,10 @@ class UserCrud(CrudMixin):
             .gino.status()
         )
 
-    @staticmethod
     async def get_user_with_transaction(
-        user_id: int, timestamp: Optional[datetime.datetime] = None
+        self, user_id: int, timestamp: Optional[datetime.datetime] = None
     ) -> Tuple[Optional[User], List[Transaction]]:
-        if not timestamp:
-            timestamp = datetime.datetime.now()
+        timestamp = self.get_timestamp(timestamp)
         txns = await (
             User.join(Transaction, isouter=True)
             .select()
@@ -73,19 +73,19 @@ class UserCrud(CrudMixin):
         return user, transactions
 
 
-class TransactionCrud:
-    @staticmethod
+class TransactionCrud(CrudMixin):
     async def create_transaction(
+        self,
         user_id: int,
         transaction_type: str,
         amount: float,
         timestamp: Optional[Union[str, datetime.datetime]] = None,
         uid: Optional[str] = None,
     ) -> Transaction:
-        if not timestamp:
-            timestamp = datetime.datetime.now()
-        else:
+        if timestamp:
             timestamp = datetime.datetime.fromisoformat(timestamp)
+        else:
+            timestamp = self.get_timestamp(timestamp)
         if not uid:
             uid = uuid.uuid4()
         transaction = await Transaction.create(
@@ -103,12 +103,10 @@ class TransactionCrud:
             Transaction.uid == transaction_uid
         ).gino.first()
 
-    @staticmethod
     async def get_user_transactions(
-        user_id: int, timestamp: Optional[datetime.datetime] = None
+        self, user_id: int, timestamp: Optional[datetime.datetime] = None
     ) -> List[Transaction]:
-        if not timestamp:
-            timestamp = datetime.datetime.now()
+        timestamp = self.get_timestamp(timestamp)
         return (
             await Transaction.query.where(Transaction.user_id == user_id)
             .where(Transaction.timestamp < timestamp)

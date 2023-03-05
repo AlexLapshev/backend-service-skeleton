@@ -54,11 +54,11 @@ async def add_transaction(request: Request) -> Response:
                 user_id=user_id,
                 transaction_type=transaction_type,
             )
-            if res != "UPDATE 1":
-                return web.json_response(status=404)
-
         except CheckViolationError:
             return web.json_response(status=402)
+
+        if res != "UPDATE 1":
+            return web.json_response(status=404)
 
         transaction = await TransactionCrud().create_transaction(
             amount=amount,
