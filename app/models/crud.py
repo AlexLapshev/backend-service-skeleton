@@ -10,9 +10,11 @@ from app.models import User, Transaction, TransactionType
 class CrudMixin:
     @staticmethod
     def make_float(amount: float, transaction_type: str) -> float:
-        if transaction_type.upper() == TransactionType.DEPOSIT.name:
-            return float(amount)
-        return float(f"-{amount}")
+        return (
+            float(amount)
+            if transaction_type.upper() == TransactionType.DEPOSIT.name
+            else -abs(float(amount))
+        )
 
     @staticmethod
     def get_timestamp(
