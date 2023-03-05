@@ -30,8 +30,7 @@ class UserCrud(CrudMixin):
 
     @staticmethod
     async def create_user(name: str) -> User:
-        user = await User.create(name=name)
-        return user
+        return await User.create(name=name)
 
     async def update_user_balance(
         self, amount: float, user_id: int, transaction_type: str
