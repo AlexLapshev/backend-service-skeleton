@@ -69,7 +69,7 @@ class UserCrud(CrudMixin):
                 timestamp=t.timestamp,
                 user_id=t.user_id,
             )
-            for t in txns
+            for t in txns if t.uid
         ]
         return user, transactions
 
